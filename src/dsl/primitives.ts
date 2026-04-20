@@ -1,7 +1,7 @@
 let _nonce = 1000;
 let _id = 0;
 
-export const nextNonce = () => ++_nonce;
+const nextNonce = () => ++_nonce;
 export const newId = (prefix = 'el') => `${prefix}-${++_id}`;
 
 export function resetIds() {

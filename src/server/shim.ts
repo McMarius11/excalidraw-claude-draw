@@ -41,16 +41,18 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_ATTEMPTS = 2;
 const DEFAULT_MODEL = 'haiku';
 const DEFAULT_BIN = 'claude';
+const MIN_CANVAS_DIM = 200;
+const MAX_CANVAS_DIM = 10_000;
+const RETRY_BACKOFF_MS = 500;
+
+function clampDim(v: number | undefined, fallback: number): number {
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(Math.max(Math.round(v as number), MIN_CANVAS_DIM), MAX_CANVAS_DIM);
+}
 
 function buildPrompt(opts: CallClaudeOptions): string {
-  const w =
-    Number.isFinite(opts.canvasWidth) && (opts.canvasWidth as number) >= 200
-      ? Math.round(opts.canvasWidth as number)
-      : 1540;
-  const h =
-    Number.isFinite(opts.canvasHeight) && (opts.canvasHeight as number) >= 200
-      ? Math.round(opts.canvasHeight as number)
-      : 900;
+  const w = clampDim(opts.canvasWidth, 1540);
+  const h = clampDim(opts.canvasHeight, 900);
   const parts: string[] = [];
   parts.push(
     `Canvas viewport: ${w}x${h} pixels. Use exactly these dimensions as the root box (col x=0 y=0 w=${w} h=${h} ...) and lay out everything inside — fill the available area, do not leave large empty space on the right/bottom.`
@@ -158,20 +160,17 @@ function callOnce(opts: CallClaudeOptions): Promise<ClaudeResult> {
 }
 
 export async function callClaude(opts: CallClaudeOptions): Promise<ClaudeResult> {
-  const maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  let lastErr: unknown;
+  const maxAttempts = Math.max(1, opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await callOnce(opts);
     } catch (e) {
-      lastErr = e;
-      if (e instanceof ClaudeShimError) {
-        if (e.aborted || e.timeout || !e.retryable || attempt === maxAttempts) throw e;
-        console.warn(`[claude] attempt ${attempt} failed, retrying: ${e.message.slice(0, 120)}`);
-      } else {
-        throw e;
-      }
+      if (!(e instanceof ClaudeShimError)) throw e;
+      if (e.aborted || e.timeout || !e.retryable || attempt === maxAttempts) throw e;
+      console.warn(`[claude] attempt ${attempt} failed, retrying: ${e.message.slice(0, 120)}`);
+      await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * attempt));
     }
   }
-  throw lastErr;
+  // unreachable: loop always returns or throws when maxAttempts >= 1
+  throw new ClaudeShimError('exhausted retries');
 }

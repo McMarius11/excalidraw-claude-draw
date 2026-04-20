@@ -13,10 +13,31 @@ const TIMEOUT_MS = Number(process.env.SCENE_CLAUDE_TIMEOUT_MS ?? 120_000);
 
 const catalog = await readFile(CATALOG_PATH, 'utf8');
 
+const MAX_BODY_BYTES = 256 * 1024;
+
+class PayloadTooLargeError extends Error {
+  constructor() {
+    super('payload too large');
+    this.name = 'PayloadTooLargeError';
+  }
+}
+
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolveBody, rejectBody) => {
+    const declared = Number(req.headers['content-length']);
+    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+      return rejectBody(new PayloadTooLargeError());
+    }
     const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => chunks.push(c));
+    let total = 0;
+    req.on('data', (c: Buffer) => {
+      total += c.length;
+      if (total > MAX_BODY_BYTES) {
+        req.destroy();
+        return rejectBody(new PayloadTooLargeError());
+      }
+      chunks.push(c);
+    });
     req.on('end', () => resolveBody(Buffer.concat(chunks).toString('utf8')));
     req.on('error', rejectBody);
   });
@@ -36,7 +57,10 @@ const server = createServer(async (req, res) => {
     let body: { userMessage?: string; currentSceneDsl?: string; model?: string; canvasWidth?: number; canvasHeight?: number };
     try {
       body = JSON.parse(await readBody(req));
-    } catch {
+    } catch (e) {
+      if (e instanceof PayloadTooLargeError) {
+        return json(res, 413, { error: { kind: 'bad_request', message: 'request body too large' } });
+      }
       return json(res, 400, { error: { kind: 'bad_request', message: 'invalid JSON' } });
     }
     if (!body || typeof body.userMessage !== 'string' || body.userMessage.trim().length === 0) {
