@@ -186,10 +186,20 @@ test('normalize: strip bare markdown code fence', () => {
   assert.equal(nodes[0].type, 'dashboard');
 });
 
-test('number: tolerate trailing "%" unit suffix', () => {
+test('number: drop percent-sized attr, keep pixel attr', () => {
+  // `w=80%` at 100px in a 1200px parent is catastrophic (renders at 8% of
+  // intended width); omission at least lets the row/col auto-flex.
   const [n] = parseDsl('bar w=80% h=12');
-  assert.equal(n.attrs.w, 80);
+  assert.equal(n.attrs.w, undefined);
   assert.equal(n.attrs.h, 12);
+});
+
+test('number: drop all percent attrs, keep other attrs + body', () => {
+  const [n] = parseDsl('rect w=100% h=50% bg=#fff "label"');
+  assert.equal(n.attrs.w, undefined);
+  assert.equal(n.attrs.h, undefined);
+  assert.equal(n.attrs.bg, '#fff');
+  assert.equal(n.body, 'label');
 });
 
 test('number: tolerate trailing "px" unit suffix', () => {

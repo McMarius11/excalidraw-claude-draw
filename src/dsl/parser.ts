@@ -31,6 +31,7 @@ type TokKind =
   | 'ident'
   | 'string'
   | 'number'
+  | 'percent'
   | 'bool'
   | 'color'
   | 'lbrace'
@@ -156,14 +157,21 @@ function tokenize(src: string): Tok[] {
     }
 
     // number (incl. negative). LLMs sometimes append CSS-style units
-    // ("w=80%", "size=12px") — eat the suffix and discard so it doesn't
-    // blow up tokenization. The numeric value is what matters downstream.
+    // ("size=12px") — eat the suffix and discard so it doesn't blow up
+    // tokenization. Percent suffixes (`w=80%`) are tokenized separately so
+    // the consumer can drop the whole attribute: the DSL layout engine
+    // expects pixel integers, and Haiku's "80" (a tenth of the real width)
+    // wrecks scenes silently.
     if (/[0-9]/.test(ch) || (ch === '-' && /[0-9]/.test(peek(1) ?? ''))) {
       let num = '';
       if (ch === '-') num += advance();
       while (i < src.length && /[0-9.]/.test(src[i])) num += advance();
-      if (i < src.length && src[i] === '%') advance();
-      else if (i + 1 < src.length && /[a-z]{2,3}/.test(src.slice(i, i + 3))) {
+      if (i < src.length && src[i] === '%') {
+        advance();
+        push('percent', num, sl, sc);
+        continue;
+      }
+      if (i + 1 < src.length && /[a-z]{2,3}/.test(src.slice(i, i + 3))) {
         const rest = src.slice(i);
         const m = rest.match(/^(px|pt|em|rem|vw|vh|deg)/);
         if (m) for (let k = 0; k < m[0].length; k++) advance();
@@ -220,7 +228,7 @@ function parseValue(ts: TokStream): DslValue {
   const t = ts.peek();
   if (t.kind === 'string') return ts.next().value;
   if (t.kind === 'color') return ts.next().value;
-  if (t.kind === 'number') {
+  if (t.kind === 'number' || t.kind === 'percent') {
     const raw = ts.next().value;
     const n = Number(raw);
     if (Number.isNaN(n)) throw new DslParseError(`bad number "${raw}"`, t.line, t.col);
@@ -255,6 +263,13 @@ function parseNode(ts: TokStream): DslNode {
     if (p.kind === 'ident' && ts.peek(1).kind === 'equals') {
       const key = ts.next().value;
       ts.expect('equals');
+      // Percent values (`w=100%`) are dropped: the layout engine expects
+      // pixel integers and row/col containers auto-flex when w/h is omitted,
+      // so omission is strictly better than coercing "100%" to 100px.
+      if (ts.peek().kind === 'percent') {
+        ts.next();
+        continue;
+      }
       node.attrs[key] = parseValue(ts);
       continue;
     }
