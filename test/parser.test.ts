@@ -171,5 +171,20 @@ test('normalize: non-breaking space treated as whitespace', () => {
   assert.deepEqual(nodes[0].attrs, { x: 10, y: 20, w: 30, h: 40 });
 });
 
+test('normalize: strip markdown code fence with language tag', () => {
+  const dsl = '```dsl\ncol x=0 y=0 w=1200 h=700 { txt "Hi" }\n```';
+  const nodes = parseDsl(dsl);
+  assert.equal(nodes.length, 1);
+  assert.equal(nodes[0].type, 'col');
+  assert.equal(nodes[0].children?.[0].body, 'Hi');
+});
+
+test('normalize: strip bare markdown code fence', () => {
+  const dsl = '```\ndashboard\n```';
+  const nodes = parseDsl(dsl);
+  assert.equal(nodes.length, 1);
+  assert.equal(nodes[0].type, 'dashboard');
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail > 0 ? 1 : 0);

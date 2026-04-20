@@ -12,8 +12,17 @@ const PUNCTUATION_NORMALIZATION: Array<[RegExp, string]> = [
   [/\u00A0/g, ' '],                                         // non-breaking space
 ];
 
+// Haiku sometimes wraps DSL output in a Markdown code fence (```dsl … ```)
+// despite instructions to emit raw source. Strip leading/trailing fences so
+// the wrapper doesn't reach the tokenizer as stray backticks.
+function stripCodeFences(src: string): string {
+  let out = src.replace(/^\s*```[^\n]*\n?/, '');
+  out = out.replace(/\n?\s*```\s*$/, '');
+  return out;
+}
+
 export function normalizeDslSource(src: string): string {
-  let out = src;
+  let out = stripCodeFences(src);
   for (const [re, repl] of PUNCTUATION_NORMALIZATION) out = out.replace(re, repl);
   return out;
 }
