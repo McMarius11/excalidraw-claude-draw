@@ -150,5 +150,26 @@ test('token-efficiency: realistic roadmap scene', () => {
   assert.equal(cards[0].attrs.total, 4);
 });
 
+test('normalize: en-dash / em-dash outside strings → ASCII hyphen', () => {
+  const dsl = 'col x=0 y=0 w=1200 h=700 pad=16 { txt size=18 "Dashboard \u2013 Overview" }';
+  const nodes = parseDsl(dsl);
+  assert.equal(nodes.length, 1);
+  const txt = nodes[0].children?.[0];
+  assert.equal(txt?.type, 'txt');
+  assert.equal(txt?.body, 'Dashboard - Overview');
+});
+
+test('normalize: smart quotes → straight quotes', () => {
+  const dsl = 'txt \u201cHello\u201d';
+  const nodes = parseDsl(dsl);
+  assert.equal(nodes[0].body, 'Hello');
+});
+
+test('normalize: non-breaking space treated as whitespace', () => {
+  const dsl = 'rect\u00a0x=10\u00a0y=20\u00a0w=30\u00a0h=40';
+  const nodes = parseDsl(dsl);
+  assert.deepEqual(nodes[0].attrs, { x: 10, y: 20, w: 30, h: 40 });
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail > 0 ? 1 : 0);

@@ -1,5 +1,23 @@
 import { DslParseError, type DslNode, type DslValue } from './types.ts';
 
+// LLMs (esp. Haiku on non-English prompts) regularly emit Unicode punctuation
+// variants — en-dash, em-dash, curly quotes — that aren't part of the DSL
+// grammar. Normalize to ASCII before tokenizing so a stray "Dashboard – Overview"
+// doesn't turn into a parse error.
+const PUNCTUATION_NORMALIZATION: Array<[RegExp, string]> = [
+  [/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-'], // hyphens, en/em/figure dash, minus
+  [/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"'],       // double smart/guillemet quotes
+  [/[\u2018\u2019\u201A\u201B]/g, "'"],                   // single smart quotes
+  [/\u2026/g, '...'],                                       // ellipsis
+  [/\u00A0/g, ' '],                                         // non-breaking space
+];
+
+export function normalizeDslSource(src: string): string {
+  let out = src;
+  for (const [re, repl] of PUNCTUATION_NORMALIZATION) out = out.replace(re, repl);
+  return out;
+}
+
 type TokKind =
   | 'ident'
   | 'string'
@@ -243,7 +261,7 @@ function parseNode(ts: TokStream): DslNode {
 }
 
 export function parseDsl(src: string): DslNode[] {
-  const ts = new TokStream(tokenize(src));
+  const ts = new TokStream(tokenize(normalizeDslSource(src)));
   const nodes: DslNode[] = [];
   while (!ts.eof()) {
     nodes.push(parseNode(ts));
