@@ -163,6 +163,11 @@ Measured and rejected — see [docs/what-we-tried.md](docs/what-we-tried.md) for
 - `--bare` — forces API-key auth (our goal was subscription-only).
 - `--exclude-dynamic-system-prompt-sections` — no-op when `--system-prompt` already replaces the default.
 
+## Acknowledgements
+
+- **[Claude Code](https://claude.com/claude-code)** (Anthropic) — the CLI this library drives as a subprocess. Proprietary; usage requires your own Claude subscription or API key. See Anthropic's [Consumer Terms](https://www.anthropic.com/legal/consumer-terms) and [Commercial Terms](https://www.anthropic.com/legal/commercial-terms).
+- **[Excalidraw](https://github.com/excalidraw/excalidraw)** — MIT-licensed. We produce data in Excalidraw's element JSON format but do not import or redistribute their code; Excalidraw itself is not a dependency of this library.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
