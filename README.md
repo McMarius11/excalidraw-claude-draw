@@ -16,11 +16,11 @@ Three pieces that work together:
 
 Same prompt, same model (`haiku`), same catalog. Probe runs a single DSL generation end-to-end and records `input_tokens + cache_creation + 0.1 * cache_read` (the effective billable input).
 
-| Configuration | Effective input tokens | Reduction |
-| --- | --- | --- |
-| Default `claude -p` | ~6,300 | baseline |
-| `--append-system-prompt` only | ~6,100 | 3% |
-| **`--system-prompt` + `--tools "" ` + `--no-session-persistence`** | **~580** | **~91%** |
+| Configuration | Flags | Effective input tokens | Reduction |
+| --- | --- | --- | --- |
+| A (baseline) | `claude -p` | ~6,300 | baseline |
+| B | `-p --append-system-prompt <catalog>` | ~6,100 | 3% |
+| **C (this library's default)** | **`-p --system-prompt <catalog> --tools "" --no-session-persistence`** | **~580** | **~91%** |
 
 On cached follow-up calls (same system prompt within the 1-hour ephemeral-cache window), the input drops further to the hundreds of tokens — the system prompt costs 10% of its tokenized length.
 

@@ -44,16 +44,16 @@ echo "=== B: Append catalog ==="
 run "B: -p --append-system-prompt CATALOG" -p --append-system-prompt "$CATALOG"
 
 echo
-echo "=== C: Append + strip tools ==="
-run "C: B + --tools \"\"" -p --append-system-prompt "$CATALOG" --tools ""
+echo "=== B+: Append + strip tools ==="
+run "B+: B + --tools \"\"" -p --append-system-prompt "$CATALOG" --tools ""
 
 echo
-echo "=== D: Replace + strip tools + no persistence (recommended) ==="
-run "D: -p --system-prompt CATALOG --tools \"\" --no-session-persistence" \
+echo "=== C: Replace + strip tools + no persistence (recommended, this lib's default) ==="
+run "C: -p --system-prompt CATALOG --tools \"\" --no-session-persistence" \
   -p --system-prompt "$CATALOG" --tools "" --no-session-persistence
 
 echo
-echo "=== D repeated (expect cache-read hit on 2nd and 3rd) ==="
+echo "=== C repeated (expect cache-read hit on 2nd and 3rd) ==="
 for i in 1 2 3; do
-  run "D #$i" -p --system-prompt "$CATALOG" --tools "" --no-session-persistence
+  run "C #$i" -p --system-prompt "$CATALOG" --tools "" --no-session-persistence
 done

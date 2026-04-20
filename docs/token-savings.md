@@ -20,7 +20,7 @@ effective = input_tokens + cache_creation + round(0.1 × cache_read)
 
 That's the number to minimize. Raw `input_tokens` alone misses the cache story entirely.
 
-## The four configurations we measured
+## The configurations we measured
 
 Same prompt (`"Draw a login form with email, password, and a button. Respond ONLY with DSL."`), same model (`haiku`), same catalog contents. Each configuration was run 3× cold (fresh cache) and averaged.
 
@@ -28,12 +28,12 @@ Same prompt (`"Draw a login form with email, password, and a button. Respond ONL
 | --- | --- | --- |
 | A (baseline) | `-p <prompt>` | ~6,300 |
 | B (append catalog) | `-p --append-system-prompt <catalog>` | ~6,100 |
-| C (strip tools) | `-p --append-system-prompt <catalog> --tools ""` | ~5,900 |
-| **D (replace + strip + no persist)** | `-p --system-prompt <catalog> --tools "" --no-session-persistence` | **~580** |
+| B+ (append + strip tools) | `-p --append-system-prompt <catalog> --tools ""` | ~5,900 |
+| **C (replace + strip + no persist)** | `-p --system-prompt <catalog> --tools "" --no-session-persistence` | **~580** |
 
-Configuration D is what this library uses by default.
+**Configuration C is what this library uses by default** (referred to throughout the code and docs as "Config C").
 
-## Why D works — a diff of what Claude actually sees
+## Why C works — a diff of what Claude actually sees
 
 - `-p` alone: system = `<default Claude Code system prompt with ~6000 tokens of tool catalog, session plumbing, persona, formatting rules>`
 - `--append-system-prompt X`: system = `<default> + X` (catalog is **additive** — default still there)
@@ -41,7 +41,7 @@ Configuration D is what this library uses by default.
 - `--tools ""`: removes tool descriptions from the system prompt entirely
 - `--no-session-persistence`: omits per-session metadata that varies call-to-call and would otherwise defeat caching
 
-Only configuration D uses all three. `--tools ""` alone on top of `--append-system-prompt` doesn't help much because most of the bloat is in Claude Code's non-tool system content.
+Only configuration C uses all three. `--tools ""` alone on top of `--append-system-prompt` doesn't help much because most of the bloat is in Claude Code's non-tool system content.
 
 ## Cache behavior — what happens on call N+1
 
@@ -50,7 +50,7 @@ Once you've paid the cache-creation cost (Anthropic marks the large prefix as ep
 - Call 1 (cold): `cache_creation` ≈ 5,800 → effective ≈ 5,800 + small request-specific prefix
 - Call 2–N (warm, within 1h): `cache_read` ≈ 5,800 → effective ≈ 580 + small prefix
 
-So **D is cheap even before caching**, and **becomes nearly free on the second call**. Compare to baseline A, where every call re-pays the full cost because the large system prompt varies slightly per invocation (session tokens, timestamps) and never fully caches.
+So **C is cheap even before caching**, and **becomes nearly free on the second call**. Compare to baseline A, where every call re-pays the full cost because the large system prompt varies slightly per invocation (session tokens, timestamps) and never fully caches.
 
 ## How to reproduce
 
