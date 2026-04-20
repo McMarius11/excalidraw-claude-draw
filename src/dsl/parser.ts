@@ -155,11 +155,19 @@ function tokenize(src: string): Tok[] {
       continue;
     }
 
-    // number (incl. negative)
+    // number (incl. negative). LLMs sometimes append CSS-style units
+    // ("w=80%", "size=12px") — eat the suffix and discard so it doesn't
+    // blow up tokenization. The numeric value is what matters downstream.
     if (/[0-9]/.test(ch) || (ch === '-' && /[0-9]/.test(peek(1) ?? ''))) {
       let num = '';
       if (ch === '-') num += advance();
       while (i < src.length && /[0-9.]/.test(src[i])) num += advance();
+      if (i < src.length && src[i] === '%') advance();
+      else if (i + 1 < src.length && /[a-z]{2,3}/.test(src.slice(i, i + 3))) {
+        const rest = src.slice(i);
+        const m = rest.match(/^(px|pt|em|rem|vw|vh|deg)/);
+        if (m) for (let k = 0; k < m[0].length; k++) advance();
+      }
       push('number', num, sl, sc);
       continue;
     }
@@ -234,24 +242,27 @@ function parseValue(ts: TokStream): DslValue {
   throw new DslParseError(`expected value but got ${t.kind} "${t.value}"`, t.line, t.col);
 }
 
-function parseAttrs(ts: TokStream): Record<string, DslValue> {
-  const attrs: Record<string, DslValue> = {};
-  while (ts.peek().kind === 'ident' && ts.peek(1).kind === 'equals') {
-    const key = ts.next().value;
-    ts.expect('equals');
-    attrs[key] = parseValue(ts);
-  }
-  return attrs;
-}
-
 function parseNode(ts: TokStream): DslNode {
   const head = ts.expect('ident');
-  const attrs = parseAttrs(ts);
-  const node: DslNode = { type: head.value, attrs };
+  const node: DslNode = { type: head.value, attrs: {} };
 
-  // optional text body: a bare string literal immediately after attrs
-  if (ts.peek().kind === 'string') {
-    node.body = ts.next().value;
+  // Accept attrs (ident=value) and an optional body string in any order.
+  // Haiku frequently emits the body before or between attrs — e.g.
+  // `txt "Title" size=20 color=#fff` or `txt h=30 "Title" size=20`.
+  // Tolerating both orderings is cheaper than fighting the LLM.
+  while (true) {
+    const p = ts.peek();
+    if (p.kind === 'ident' && ts.peek(1).kind === 'equals') {
+      const key = ts.next().value;
+      ts.expect('equals');
+      node.attrs[key] = parseValue(ts);
+      continue;
+    }
+    if (p.kind === 'string' && node.body === undefined) {
+      node.body = ts.next().value;
+      continue;
+    }
+    break;
   }
 
   if (ts.peek().kind === 'lbrace') {

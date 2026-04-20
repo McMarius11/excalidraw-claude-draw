@@ -186,5 +186,33 @@ test('normalize: strip bare markdown code fence', () => {
   assert.equal(nodes[0].type, 'dashboard');
 });
 
+test('number: tolerate trailing "%" unit suffix', () => {
+  const [n] = parseDsl('bar w=80% h=12');
+  assert.equal(n.attrs.w, 80);
+  assert.equal(n.attrs.h, 12);
+});
+
+test('number: tolerate trailing "px" unit suffix', () => {
+  const [n] = parseDsl('rect w=320px h=48px');
+  assert.equal(n.attrs.w, 320);
+  assert.equal(n.attrs.h, 48);
+});
+
+test('body: string before attrs (Haiku style)', () => {
+  const [n] = parseDsl('txt "Title" size=20 color=#fff');
+  assert.equal(n.type, 'txt');
+  assert.equal(n.body, 'Title');
+  assert.equal(n.attrs.size, 20);
+  assert.equal(n.attrs.color, '#fff');
+});
+
+test('body: interleaved between attrs', () => {
+  const [n] = parseDsl('txt h=30 "Kanban Board" size=18 color=#e4e7ec');
+  assert.equal(n.body, 'Kanban Board');
+  assert.equal(n.attrs.h, 30);
+  assert.equal(n.attrs.size, 18);
+  assert.equal(n.attrs.color, '#e4e7ec');
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail > 0 ? 1 : 0);
